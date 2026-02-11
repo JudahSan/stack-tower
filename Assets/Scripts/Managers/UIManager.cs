@@ -1,14 +1,5 @@
 using UnityEngine;
-using UnityEngine.UI;
-using System.Collections.Generic;
-
-[System.Serializable]
-public class ShapeUI
-{
-    public ShapeType shapeType;
-    public Sprite sprite;
-    public string displayName;
-}
+using TMPro;
 
 public class UIManager : MonoBehaviour
 {
@@ -16,39 +7,38 @@ public class UIManager : MonoBehaviour
     public GameObject menuScreen;
     public GameObject gameScreen;
     public GameObject gameOverScreen;
-    public GameObject shapeSelectionScreen;
     
-    [Header("Game UI")]
-    public Text scoreText;
-    public Text highScoreText;
-    public Text currentShapeText;
-    public Image currentShapeImage;
+    [Header("Game UI - TextMeshPro")]
+    public TMP_Text scoreText;
+    public TMP_Text highScoreText;
+    public TMP_Text fpsText;
     
-    [Header("Game Over")]
-    public Text finalScoreText;
-    public Text newHighScoreText;
+    [Header("Game Over UI")]
+    public TMP_Text finalScoreText;
+    public TMP_Text newHighScoreText;
     
-    [Header("Shape Selection")]
-    public Transform shapeButtonContainer;
-    public GameObject shapeButtonPrefab;
-    public List<ShapeUI> shapeUIs = new List<ShapeUI>();
-    
-    private Dictionary<ShapeType, ShapeUI> shapeDictionary;
     private int highScore = 0;
+    private float deltaTime = 0.0f;
     
     void Start()
     {
-        InitializeShapeDictionary();
         LoadHighScore();
         ShowMenu();
     }
     
-    void InitializeShapeDictionary()
+    void Update()
     {
-        shapeDictionary = new Dictionary<ShapeType, ShapeUI>();
-        foreach (ShapeUI shapeUI in shapeUIs)
+        // Update FPS counter
+        if (fpsText != null)
         {
-            shapeDictionary[shapeUI.shapeType] = shapeUI;
+            deltaTime += (Time.unscaledDeltaTime - deltaTime) * 0.1f;
+            float fps = 1.0f / deltaTime;
+            fpsText.text = $"FPS: {Mathf.Ceil(fps)}";
+            
+            // Color code FPS
+            if (fps >= 28) fpsText.color = Color.green;
+            else if (fps >= 25) fpsText.color = Color.yellow;
+            else fpsText.color = Color.red;
         }
     }
     
@@ -69,7 +59,6 @@ public class UIManager : MonoBehaviour
         SetScreen(menuScreen, true);
         SetScreen(gameScreen, false);
         SetScreen(gameOverScreen, false);
-        SetScreen(shapeSelectionScreen, false);
     }
     
     public void ShowGameUI()
@@ -77,10 +66,8 @@ public class UIManager : MonoBehaviour
         SetScreen(menuScreen, false);
         SetScreen(gameScreen, true);
         SetScreen(gameOverScreen, false);
-        SetScreen(shapeSelectionScreen, false);
         
         UpdateScore(0);
-        UpdateCurrentShape(GameManager.Instance.currentShapeType);
     }
     
     public void ShowGameOver(int score)
@@ -95,32 +82,22 @@ public class UIManager : MonoBehaviour
         {
             highScore = score;
             PlayerPrefs.SetInt("HighScore", highScore);
+            PlayerPrefs.Save();
+            
             if (newHighScoreText != null)
                 newHighScoreText.gameObject.SetActive(true);
         }
-    }
-    
-    public void ShowShapeSelection()
-    {
-        SetScreen(shapeSelectionScreen, true);
+        else
+        {
+            if (newHighScoreText != null)
+                newHighScoreText.gameObject.SetActive(false);
+        }
     }
     
     public void UpdateScore(int score)
     {
         if (scoreText != null)
             scoreText.text = $"Score: {score}";
-    }
-    
-    public void UpdateCurrentShape(ShapeType shapeType)
-    {
-        if (shapeDictionary.ContainsKey(shapeType))
-        {
-            if (currentShapeText != null)
-                currentShapeText.text = shapeDictionary[shapeType].displayName;
-            
-            if (currentShapeImage != null)
-                currentShapeImage.sprite = shapeDictionary[shapeType].sprite;
-        }
     }
     
     void SetScreen(GameObject screen, bool active)
@@ -145,9 +122,8 @@ public class UIManager : MonoBehaviour
         GameManager.Instance.SetGameState(GameState.Menu);
     }
     
-    public void OnShapeSelected(ShapeType shapeType)
+    public void OnQuitButton()
     {
-        GameManager.Instance.ChangeShape(shapeType);
-        ShowGameUI();
+        GameManager.Instance.QuitGame();
     }
 }

@@ -1,75 +1,90 @@
-using System.Collections;
 using UnityEngine;
+using System.Collections;
+using UnityEngine.InputSystem;
 
 public class BlockSpawner : MonoBehaviour
 {
     [Header("References")]
-    [SerializeField] private Transform spawnPoint;
-    
+    public Transform spawnPoint;
+
+    [Header("Settings")]
+    public float blockSpeed = 8f;
+    public float speedIncrease = 0.5f;
+    public int direction = 1;
+
     private GameObject currentShape;
     private ShapeController shapeController;
-    private float blockSpeed = 8f;
-    private int direction = 1;
     private bool canDrop = true;
     private bool isSpawning = false;
-    
+
     void Update()
     {
-        if (!isSpawning || GameManager.Instance.IsGameOver || currentShape == null) return;
-        
-        HandleHorizontalMovement();
-        
-        // Desktop input for testing
-        #if UNITY_EDITOR || UNITY_STANDALONE
-        if (Input.GetKeyDown(KeyCode.Space) && canDrop)
+        if (!isSpawning || GameManager.Instance == null || GameManager.Instance.IsGameOver) return;
+
+        if (currentShape != null && !IsShapeDropped())
         {
-            DropCurrentShape();
+            HandleMovement();
+
+            // Desktop input for testing
+            if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame && canDrop)
+            {
+                DropCurrentShape();
+            }
         }
-        #endif
     }
-    
-    void HandleHorizontalMovement()
+
+    void HandleMovement()
     {
-        if (shapeController == null || shapeController.IsDropped) return;
-        
-        // Horizontal movement (auto-bounce)
         float moveAmount = Time.deltaTime * blockSpeed * direction;
         currentShape.transform.position += new Vector3(moveAmount, 0, 0);
-        
-        // Bounce at limits
+
         if (Mathf.Abs(currentShape.transform.position.x) > GameManager.Instance.xLimit)
         {
             currentShape.transform.position = new Vector3(
-                direction * GameManager.Instance.xLimit, 
-                spawnPoint.position.y, 
+                direction * GameManager.Instance.xLimit,
+                spawnPoint.position.y,
                 0
             );
             direction = -direction;
         }
     }
-    
+
+    bool IsShapeDropped()
+    {
+        return shapeController != null && shapeController.IsDropped;
+    }
+
     public void StartSpawning()
     {
         isSpawning = true;
-        blockSpeed = 8f; // Reset speed
+        blockSpeed = 8f;
+        direction = 1;
         SpawnNewShape();
     }
-    
+
     public void StopSpawning()
     {
         isSpawning = false;
     }
-    
+
     void SpawnNewShape()
     {
-        if (!isSpawning) return;
-        
-        // Get shape from pool
-        currentShape = GetComponent<PoolManager>().GetShape(
-            GameManager.Instance.currentShapeType,
-            spawnPoint.position
-        );
-        
+        if (!isSpawning || GameManager.Instance.IsGameOver) return;
+
+        PoolManager poolManager = GetComponent<PoolManager>();
+        if (poolManager == null)
+        {
+            Debug.LogError("PoolManager not found!");
+            return;
+        }
+
+        // Get RANDOM shape from GameManager
+        ShapeType randomShape = GameManager.Instance.GetRandomShape();
+
+        Debug.Log($"Spawning random shape: {randomShape}");
+
+        currentShape = poolManager.GetShape(randomShape, spawnPoint.position);
+
         if (currentShape != null)
         {
             shapeController = currentShape.GetComponent<ShapeController>();
@@ -77,38 +92,39 @@ public class BlockSpawner : MonoBehaviour
             {
                 shapeController.Initialize();
             }
-            
-            // Random starting rotation
+
+            // Random rotation
             currentShape.transform.rotation = Quaternion.Euler(0, 0, Random.Range(0, 360f));
-            
+
             // Increase difficulty
-            blockSpeed += 0.5f;
+            blockSpeed += speedIncrease;
+        }
+        else
+        {
+            Debug.LogError($"Failed to spawn shape: {randomShape}");
         }
     }
-    
-    // Called by Drop Button
+
     public void DropCurrentShape()
     {
-        if (currentShape == null || !canDrop) return;
-        if (shapeController != null && shapeController.IsDropped) return;
-        
+        if (currentShape == null || !canDrop || IsShapeDropped()) return;
+
         canDrop = false;
-        
+
         if (shapeController != null)
         {
             shapeController.Drop();
         }
-        
+
         GameManager.Instance.AddScore(10);
-        
-        // Spawn next shape after delay
+
         StartCoroutine(SpawnNextShape());
     }
-    
+
     IEnumerator SpawnNextShape()
     {
         yield return new WaitForSeconds(GameManager.Instance.dropCooldown);
-        
+
         canDrop = true;
         if (isSpawning && !GameManager.Instance.IsGameOver)
         {

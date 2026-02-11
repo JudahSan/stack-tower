@@ -36,7 +36,7 @@ public class DropButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     
     public void OnPointerUp(PointerEventData eventData)
     {
-        BlockSpawner spawner = FindObjectOfType<BlockSpawner>();
+        BlockSpawner spawner = FindFirstObjectByType<BlockSpawner>();
         if (spawner != null && GameManager.Instance != null && !GameManager.Instance.IsGameOver)
         {
             spawner.DropCurrentShape();
